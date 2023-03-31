@@ -20,7 +20,7 @@ variables:
     function_app_name: 'comp-aws-root-acc-mgmt-live-func'
   ${{ if eq(variables['Build.SourceBranchName'], 'develop') }}:
     function_app_name: 'comp-aws-root-acc-mgmt-dev-func'
-  azurerm_service_connection: 'comp - AWS Root Account Management (e503b6db-174b-4258-beaf-6ec0f33ec311)'
+  azurerm_service_connection: 'comp - AWS Root Account Management (asd)'
 
 stages:
   - stage: function_deployment
