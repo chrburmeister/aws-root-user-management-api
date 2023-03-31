@@ -1,0 +1,42 @@
+parameters:
+- name: terraform_directory
+  displayName: 'path to terraform directorty'
+  default: '$(Build.Repository.LocalPath)/terraform'
+- name: terrascan_config_name
+  default: '.terrascan-config.toml'
+
+steps:
+
+- task: Bash@3
+  name: terrascan_install
+  inputs:
+    targetType: 'inline'
+    script: |
+      mkdir -p TerrascanReport
+      curl --location https://github.com/accurics/terrascan/releases/download/v1.17.1/terrascan_1.17.1_Linux_x86_64.tar.gz --output terrascan.tar.gz
+      tar -xvf terrascan.tar.gz
+      sudo install terrascan /usr/local/bin && rm terrascan
+      terrascan version
+      terrascan init
+  displayName: terrascan - install
+  continueOnError: true
+  condition: always()
+
+- task: PowerShell@2
+  inputs:
+    targetType: 'inline'
+    script: |
+      Write-Output "$($env:tflint_config_file_name)"
+      New-Item -Path . -Name tfscanreports -ItemType Directory -Force
+
+      $current_path = Get-Location | Select-Object -ExpandProperty Path
+      
+      terrascan scan -i arm -c "$($current_path)/$($ENV:terrascan_config_name)" --output junit-xml | Out-File -Path .\tfscanreports\terrascan.xml -Force
+    failOnStderr: true
+    pwsh: true
+    workingDirectory: ${{ parameters.terraform_directory }}
+  env:
+    terrascan_config_name: ${{ parameters.terrascan_config_name }}
+  displayName: terrascan
+  condition: always()
+  name: terrascan

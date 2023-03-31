@@ -1,0 +1,31 @@
+trigger: none
+
+parameters:
+- name: vm_image
+  default: 'ubuntu-20.04'
+  values:
+  - 'ubuntu-20.04'
+  displayName: Worker VM Image
+- name: terraform_directory
+  default: '$(Build.Repository.LocalPath)/terraform'
+  displayName: Path to the terraform directory
+
+stages:
+- stage: terraform_fmt
+  pool:
+    vmImage: ${{ parameters.vm_image }}
+  jobs:
+  - job: terraform_fmt
+    displayName: terraform fmt
+    steps:
+    - checkout: self
+      persistCredentials: true
+      clean: true
+
+    - template: ../templates/steps/terraform_fmt.yml
+      parameters:
+        terraform_directory: ${{ parameters.terraform_directory }}
+
+    - template: ../templates/steps/git_commit_changes.yml
+      parameters:
+        commit_message: "chore(terraform fmt): :arrow_up:  format terraform code accordig to best practices [skip ci]"

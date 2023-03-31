@@ -1,0 +1,44 @@
+parameters:
+- name: terraform_directory
+  displayName: 'path to terraform directorty'
+  default: '$(Build.Repository.LocalPath)/terraform'
+
+steps: 
+
+- task: Bash@3
+  displayName: 'terraform-docs install'
+  name: terraform_docs_install
+  inputs:
+    targetType: 'inline'
+    workingDirectory: ${{ parameters.terraform_directory }}
+    script: |
+      curl -sSLo ./terraform-docs.tar.gz https://terraform-docs.io/dl/v0.16.0/terraform-docs-v0.16.0-$(uname)-amd64.tar.gz
+      tar -xzf terraform-docs.tar.gz
+      chmod +x terraform-docs
+  condition: always()
+
+- task: PowerShell@2
+  inputs:
+    targetType: 'inline'
+    script: |
+      $current_path = Get-Location | Select-Object -ExpandProperty Path
+      $terraform_folders = Get-ChildItem -Directory -Recurse | Select-Object -ExpandProperty FullName
+      
+      foreach ($folder in $terraform_folders) {
+        # not recursive because it would catch empty folders too
+        $terraform_files = Get-ChildItem -Path $folder -File | Where-Object {$_.name -match '\.(tf)$'}
+
+        if (-not ($terraform_files)) {
+          continue
+        }
+        
+        .\terraform-docs markdown $folder | Out-File -Path "$($folder)/docs.md" -Force -Confirm:$false
+      }
+      
+      .\terraform-docs markdown . | Out-File -Path "$($current_path)/docs.md" -Force
+    failOnStderr: true
+    pwsh: true
+    workingDirectory: ${{ parameters.terraform_directory }}
+  displayName: terraform docs
+  condition: always()
+  name: terraform_docs

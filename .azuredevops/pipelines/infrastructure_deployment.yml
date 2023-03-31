@@ -1,0 +1,48 @@
+trigger:
+  batch: true
+  branches:
+    include:
+    - main
+    - develop
+  paths:
+    include:
+    - terraform
+
+parameters:
+- name: vm_image
+  default: 'ubuntu-20.04'
+  values:
+  - 'ubuntu-20.04'
+  displayName: Worker VM Image
+- name: terraform_directory
+  default: '$(Build.Repository.LocalPath)/terraform'
+  displayName: Path to the terraform directory
+
+variables:
+  ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
+    environment: 'live'
+    tfvars_file_name: 'env_live.tfvars'
+    tfvars_file_secure: 'env_live_sec_tfvars'
+    tfvars_file_secure_backend: 'env_live_backend_sec_tfvars'
+  ${{ if eq(variables['Build.SourceBranchName'], 'develop') }}:
+    environment: 'dev'
+    tfvars_file_name: 'env_dev.tfvars'
+    tfvars_file_secure: 'env_dev_sec_tfvars'
+    tfvars_file_secure_backend: 'env_dev_backend_sec_tfvars'
+
+stages:
+- template: ../templates/stages/terraform_init_plan.yml
+  parameters:
+    environment: $(environment)
+    vm_image: ${{ parameters.vm_image }}
+    tfvars_file_name: $(tfvars_file_name)
+    tfvars_file_secure: $(tfvars_file_secure)
+    tfvars_file_secure_backend: $(tfvars_file_secure_backend)
+    terraform_directory: ${{ parameters.terraform_directory }}
+- template: ../templates/stages/terraform_init_apply.yml
+  parameters:
+    environment: $(environment)
+    vm_image: ${{ parameters.vm_image }}
+    tfvars_file_secure_backend: $(tfvars_file_secure_backend)
+    azure_devops_environment: 'Azure Deployment'
+    terraform_directory: ${{ parameters.terraform_directory }}

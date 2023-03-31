@@ -1,0 +1,44 @@
+parameters:
+- name: environment
+  default: 'develop'
+  displayName: name of environment
+- name: vm_image
+  default: 'ubuntu-20.04'
+  values:
+    - 'ubuntu-16.04'
+    - 'ubuntu-18.04'
+    - 'ubuntu-20.04'
+  displayName: Worker VM Image
+- name: tfvars_file_name
+  default: env_dev.tfvars
+  displayName: tfvars file for general variables
+- name: tfvars_file_secure
+  default: env_dev.sec.tfvars
+  displayName: tfvars file for credentials
+- name: tfvars_file_secure_backend
+  default: env_dev_backend.sec.tfvars
+  displayName: tfvars file for backend credentials
+- name: terraform_directory
+  default: '$(Build.Repository.LocalPath)/terraform'
+  displayName: Path to the terraform directory
+
+stages:
+  - stage: terraform_init_plan
+    pool:
+      vmImage: ${{ parameters.vm_image }}
+    jobs:
+      - job: terraform_init_plan
+        displayName: terraform init and plan
+        steps:
+          - checkout: self
+
+          - template: ../steps/terraform_init.yml
+            parameters:
+              terraform_directory: ${{ parameters.terraform_directory }}
+              tfvars_file_secure_backend: ${{ parameters.tfvars_file_secure_backend }}
+          
+          - template: ../steps/terraform_plan.yml
+            parameters:
+              terraform_directory: ${{ parameters.terraform_directory }}
+              tfvars_file_secure: ${{ parameters.tfvars_file_secure }}
+              tfvars_file_name: ${{ parameters.tfvars_file_name }}

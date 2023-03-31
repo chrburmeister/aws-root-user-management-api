@@ -1,0 +1,17 @@
+parameters:
+- name: folder
+  default: '$(Build.Repository.LocalPath)/terraform/tfscanreports'
+
+steps:
+
+- task: PublishTestResults@2
+  displayName: "Publish Terraform Checks Test Results"
+  condition: SucceededOrFailed()
+  inputs:
+    testResultsFormat: JUnit
+    testResultsFiles: "**/*.xml"
+    searchFolder: ${{ parameters.folder }}
+    mergeTestResults: true
+    failTaskOnFailedTests: true
+    publishRunAttachments: true
+    testRunTitle: "tf-lint results"

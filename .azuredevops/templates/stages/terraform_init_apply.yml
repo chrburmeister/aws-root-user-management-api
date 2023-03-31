@@ -1,0 +1,37 @@
+parameters:
+- name: environment
+  default: 'develop'
+  displayName: name of environment
+- name: vm_image
+  default: 'ubuntu-20.04'
+  values:
+    - 'ubuntu-20.04'
+  displayName: Worker VM Image
+- name: tfvars_file_secure_backend
+  default: env_dev_backend.sec.tfvars
+  displayName: tfvars file for backend credentials
+- name: azure_devops_environment
+  displayName: Name of the Azure DevOps Environment to be used
+- name: terraform_directory
+
+stages:
+  - stage: terraform_init_apply
+    pool:
+      vmImage: ${{ parameters.vm_image }}
+    dependsOn: terraform_init_plan
+    condition: and(succeeded(), eq(dependencies.terraform_init_plan.outputs['terraform_init_plan.terraform_show.terraformApplyShouldrun'], 'true'))
+    jobs:
+      - deployment: terraform_init_apply
+        displayName: terraform init and apply
+        continueOnError: false
+        environment: ${{ parameters.azure_devops_environment }}
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                
+                - template: ../steps/terraform_apply.yml
+                  parameters:
+                    terraform_directory: ${{ parameters.terraform_directory }}
+                    tfvars_file_secure_backend: ${{ parameters.tfvars_file_secure_backend }}

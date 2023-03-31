@@ -1,0 +1,64 @@
+parameters:
+- name: terraform_directory
+  displayName: 'path to terraform directorty'
+  default: '$(Build.Repository.LocalPath)/terraform'
+- name: tfvars_file_secure
+- name: tfvars_file_name
+
+steps:
+
+- task: DownloadSecureFile@1
+  name: tfvars_file_secure
+  inputs:
+    secureFile: ${{ parameters.tfvars_file_secure }}
+    retryCount: '8'
+  displayName: Download Secure File - backend.sec.tfvars  
+  continueOnError: false
+
+- task: PowerShell@2
+  inputs:
+    targetType: 'inline'
+    script: |
+      $tfvars_file_path  = Get-ChildItem | Where-Object {$_.name -eq $env:tfvars_file_name} | Select-Object -ExpandProperty fullname
+
+      if(-not($tfvars_file_path)){
+        Write-Output "could not find tfvars file = $($env:tfvars_file_name)"
+        exit 1
+      }
+
+      # terraform plan
+      terraform plan `
+        -input=false `
+        -out="tfplan" `
+        -var-file="$tfvars_file_path" `
+        -var-file="$(tfvars_file_secure.secureFilePath)"
+
+    pwsh: true
+    workingDirectory: ${{ parameters.terraform_directory }}
+  displayName: terraform plan
+  name: terraform_plan
+  env:
+    tfvars_file_name: ${{ parameters.tfvars_file_name }}
+
+- template: ./terraform_show.yml
+  parameters:
+    terraform_directory: ${{ parameters.terraform_directory }}
+    plan_file_name: 'tfplan'
+
+- task: ArchiveFiles@2
+  displayName: Create Archive for terraform plan file
+  condition: eq(variables['runTerraformApply'], 'true')
+  inputs:
+    rootFolderOrFile: ${{ parameters.terraform_directory }}
+    includeRootFolder: false
+    archiveType: 'zip'
+    archiveFile: '$(Build.ArtifactStagingDirectory)/tf.zip'
+    replaceExistingArchive: true
+
+- task: PublishBuildArtifacts@1
+  condition: eq(variables['runTerraformApply'], 'true')
+  displayName: Publish Build Artifacts
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)/tf.zip'
+    ArtifactName: 'drop'
+    publishLocation: 'Container'

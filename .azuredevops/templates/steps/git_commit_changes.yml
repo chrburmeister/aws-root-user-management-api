@@ -1,0 +1,28 @@
+parameters:
+- name: branch_name
+  default: '$(Build.SourceBranchName)'
+- name: commit_message
+  default:  
+
+steps:
+
+- task: PowerShell@2
+  inputs:
+    targetType: 'inline'
+    script: |
+      write-host "commit all changes"
+      git config user.email "ci@company.com"
+      git config user.name "Azure Pipeline - Automation"
+      git checkout $env:Build_SourceBranchName --
+      git add --all
+      git commit -m "$env:commit_message"
+      write-host "push code to repo"
+      git push origin HEAD:$env:Build_SourceBranchName
+    failOnStderr: false
+    pwsh: true
+  env:
+    Build_SourceBranchName: ${{ parameters.branch_name }}
+    commit_message: ${{ parameters.commit_message }}
+  displayName: git - commit changes
+  condition: always()
+  name: git_commit_changes

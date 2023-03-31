@@ -1,0 +1,53 @@
+parameters:
+- name: terraform_directory
+  displayName: 'path to terraform directorty'
+  default: '$(Build.Repository.LocalPath)/terraform'
+- name: plan_file_name
+  default: 'tfplan'
+
+steps:
+
+- task: PowerShell@2
+  inputs:
+    targetType: 'inline'
+    script: |
+      $plan_file_path  = Get-ChildItem | Where-Object {$_.name -eq $env:plan_file_name} | Select-Object -ExpandProperty fullname
+
+      if(-not($plan_file_path)){
+        Write-Output "could not find plan file = $($env:plan_file_name)"
+        exit 1
+      } else {
+        Write-Output "plan file found - $($env:plan_file_name)"
+      }
+
+      $plan = terraform show -json $plan_file_path | ConvertFrom-Json
+
+      $change_required = $false
+
+      foreach ($res in $plan.resource_changes) {
+        if($_.change.actions -ne 'no-op') {
+          Write-Output "changes are necessary"
+          $change_required = $true
+          break
+        }
+      }
+
+      if ($change_required) {
+        Write-Output "terraform plan does contain changes - setting pipeline var runTerraformApply to true"
+        Write-Output "##vso[task.setvariable variable=runTerraformApply]true"
+
+        Write-Output "terraform plan does contain changes - setting pipeline var terraformApplyShouldrun to true"
+        Write-Output "##vso[task.setvariable variable=terraformApplyShouldrun;isOutput=true]true"
+      } else {
+        Write-Output "terraform plan does not contain changes - setting pipeline var runTerraformApply to false"
+        Write-Output "##vso[task.setvariable variable=runTerraformApply]false"
+
+        Write-Output "terraform plan does not contain changes - setting pipeline var terraformApplyShouldrun to false"
+        Write-Output "##vso[task.setvariable variable=terraformApplyShouldrun;isOutput=true]false"
+      }
+    pwsh: true
+    workingDirectory: ${{ parameters.terraform_directory }}
+  displayName: terraform show
+  name: terraform_show
+  env:
+    plan_file_name: ${{ parameters.plan_file_name }}

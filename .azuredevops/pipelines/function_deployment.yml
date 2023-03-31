@@ -1,0 +1,51 @@
+trigger:
+  batch: true
+  branches:
+    include:
+    - main
+    - develop
+  paths:
+    include:
+    - function_app
+
+parameters:
+- name: vm_image
+  default: 'ubuntu-20.04'
+  values:
+    - 'ubuntu-20.04'
+  displayName: Worker VM Image
+
+variables:
+  ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
+    function_app_name: 'comp-aws-root-acc-mgmt-live-func'
+  ${{ if eq(variables['Build.SourceBranchName'], 'develop') }}:
+    function_app_name: 'comp-aws-root-acc-mgmt-dev-func'
+  azurerm_service_connection: 'comp - AWS Root Account Management (e503b6db-174b-4258-beaf-6ec0f33ec311)'
+
+stages:
+  - stage: function_deployment
+    pool:
+      vmImage: ${{ parameters.vm_image }}
+    jobs:
+      - job: deploy_function_app_source_code
+        displayName: terraform init and plan
+        steps:
+          - checkout: self
+
+          - task: ArchiveFiles@2
+            displayName: create zip archive for function app deployment
+            inputs:
+              rootFolderOrFile: '$(Build.Repository.LocalPath)/function_app/aws_root_account_mail_mgmt'
+              includeRootFolder: false
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/function.zip'
+              replaceExistingArchive: true
+
+          - task: AzureFunctionApp@1
+            displayName: deploy function app code
+            inputs:
+              azureSubscription: $(azurerm_service_connection)
+              appType: 'functionApp'
+              appName: $(function_app_name)
+              package: '$(Build.ArtifactStagingDirectory)/function.zip'
+              deploymentMethod: 'auto'

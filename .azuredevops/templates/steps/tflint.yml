@@ -1,0 +1,50 @@
+parameters:
+- name: terraform_directory
+  displayName: 'path to terraform directorty'
+  default: '$(Build.Repository.LocalPath)/terraform'
+- name: tflint_config_file_name
+  default: '.tflint.hcl'
+
+steps:
+
+- task: Bash@3
+  name: tflint_install
+  inputs:
+    targetType: 'inline'
+    script: |
+      curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash
+  displayName: linter - tflint - install
+  continueOnError: true
+  condition: always()
+
+- task: PowerShell@2
+  inputs:
+    targetType: 'inline'
+    script: |
+      Write-Output "$($env:tflint_config_file_name)"
+      New-Item -Path . -Name tfscanreports -ItemType Directory -Force
+
+      $tflint_config = Get-ChildItem .\ -File -Force | Where-Object {$_.name -eq $env:tflint_config_file_name}
+
+      if (-not ($tflint_config)) {
+        Write-Output "No tflint config file named $($env:tflint_config_file_name) found!"
+        Exit 1
+      } else {
+        Write-Output "tflint config found!"
+        tflint --init --config "$($tflint_config.fullname)"
+      }
+
+      $terraform_files = Get-ChildItem -File -Recurse | Where-Object {$_.name -match '\.(tf)$'}
+
+      foreach ($file in $terraform_files) {
+        tflint "$($file.fullname)" --config "$($tflint_config.fullname)" --format junit | Out-File -Path .\tfscanreports\tflint_$($file.name).xml -Force
+      }
+
+    failOnStderr: true
+    pwsh: true
+    workingDirectory: ${{ parameters.terraform_directory }}
+  env:
+    tflint_config_file_name: ${{ parameters.tflint_config_file_name }}
+  displayName: linter - tflint
+  condition: always()
+  name: tflint

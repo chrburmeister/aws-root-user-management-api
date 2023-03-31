@@ -1,0 +1,26 @@
+parameters:
+- name: terraform_directory
+  displayName: 'path to terraform directorty'
+  default: '$(Build.Repository.LocalPath)/terraform'
+
+steps:
+- task: PowerShell@2
+  inputs:
+    targetType: 'inline'
+    script: |
+      $terraform_validation_result = terraform validate -json | ConvertFrom-Json
+
+      if (-not ($terraform_validation_result.error_count -eq 0 -and $terraform_validation_result.warning_count -eq 0) ) {
+        Write-Output "terraform validation failed:"
+        Write-Output $terraform_validation_result
+
+        exit 1
+      } else {
+        Write-Output "terraform validation was successful"
+      }
+    failOnStderr: true
+    pwsh: true
+    workingDirectory: ${{ parameters.terraform_directory }}
+  displayName: terraform validate
+  condition: always()
+  name: terraform_validate
